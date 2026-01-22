@@ -126,8 +126,14 @@ const Index = () => {
       const data = await res.json();
       
       if (data.success) {
-        toast.success('Анализ завершён', {
-          description: `Применимые статьи: ${data.data.analysis_result.suggested_articles.join(', ')}`
+        const result = data.data.analysis_result;
+        const articlesText = result.article_details && result.article_details.length > 0
+          ? result.article_details.slice(0, 3).map((a: any) => `${a.number} - ${a.title}`).join('; ')
+          : result.suggested_articles.slice(0, 5).join(', ');
+        
+        toast.success('Анализ завершён успешно!', {
+          description: `Найдено статей: ${result.total_found || result.suggested_articles.length}. Применимые статьи: ${articlesText}`,
+          duration: 8000
         });
         loadAnalyses();
       } else {
