@@ -233,8 +233,39 @@ const Index = () => {
             </form>
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-slate-700 font-semibold mb-2">Тестовый доступ:</p>
-              <p className="text-xs text-slate-600">Логин: admin</p>
-              <p className="text-xs text-slate-600">Пароль: admin123</p>
+              <p className="text-xs text-slate-600">Если не можете войти, создайте нового пользователя:</p>
+              <p className="text-xs text-slate-600">Логин: test / Пароль: test123</p>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const res = await fetch(API_URLS.auth, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'register',
+                        username: 'testuser',
+                        password: 'test123',
+                        full_name: 'Тестовый Пользователь',
+                        rank: 'Капитан',
+                        department: 'Отдел тестирования'
+                      })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      toast.success('Пользователь создан!', { description: 'Войдите как testuser / test123' });
+                    } else {
+                      toast.error('Ошибка', { description: data.error });
+                    }
+                  } catch (e) {
+                    toast.error('Ошибка создания пользователя');
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+              >
+                Создать тестового пользователя
+              </Button>
             </div>
           </CardContent>
         </Card>
