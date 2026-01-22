@@ -30,6 +30,7 @@ const Index = () => {
   const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFileBase64, setUploadedFileBase64] = useState('');
   const [extractedText, setExtractedText] = useState('');
 
   const modules = [
@@ -96,7 +97,8 @@ const Index = () => {
         date: new Date(a.created_at).toLocaleDateString('ru-RU'),
         type: `${a.category} (дело ${a.case_number})`,
         status: a.status === 'completed' ? 'Завершён' : 'В обработке',
-        officer: a.officer_name || 'Неизвестно'
+        officer: a.officer_name || 'Неизвестно',
+        documentCount: a.document_count || 0
       })));
     } catch (error) {
       console.error('Ошибка загрузки анализов:', error);
@@ -112,17 +114,29 @@ const Index = () => {
       const description = (document.getElementById('description') as HTMLTextAreaElement)?.value;
       const evidence = (document.getElementById('evidence') as HTMLTextAreaElement)?.value;
 
+      const payload: any = {
+        case_number: caseNumber,
+        incident_date: date,
+        category,
+        description,
+        evidence,
+        officer_id: currentUser?.id || 1
+      };
+
+      if (uploadedFile && uploadedFileBase64) {
+        payload.document = {
+          file_name: uploadedFile.name,
+          file_type: uploadedFile.name.split('.').pop()?.toUpperCase() || 'TXT',
+          file_size: uploadedFile.size,
+          file_data: uploadedFileBase64,
+          extracted_text: extractedText
+        };
+      }
+
       const res = await fetch(API_URLS.analysis, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          case_number: caseNumber,
-          incident_date: date,
-          category,
-          description,
-          evidence,
-          officer_id: 1
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
@@ -133,10 +147,14 @@ const Index = () => {
           ? result.article_details.slice(0, 3).map((a: any) => `${a.number} - ${a.title}`).join('; ')
           : result.suggested_articles.slice(0, 5).join(', ');
         
+        const docInfo = uploadedFile ? ` Документ "${uploadedFile.name}" сохранён.` : '';
         toast.success('Анализ завершён успешно!', {
-          description: `Найдено статей: ${result.total_found || result.suggested_articles.length}. Применимые статьи: ${articlesText}`,
+          description: `Найдено статей: ${result.total_found || result.suggested_articles.length}. Применимые статьи: ${articlesText}.${docInfo}`,
           duration: 8000
         });
+        setUploadedFile(null);
+        setUploadedFileBase64('');
+        setExtractedText('');
         loadAnalyses();
       } else {
         toast.error('Ошибка анализа', { description: data.error });
@@ -397,7 +415,15 @@ const Index = () => {
                         >
                           <div className="flex-1">
                             <p className="font-semibold text-secondary">{analysis.type}</p>
-                            <p className="text-sm text-slate-600">Сотрудник: {analysis.officer}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm text-slate-600">Сотрудник: {analysis.officer}</p>
+                              {analysis.documentCount > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Icon name="Paperclip" size={12} className="mr-1" />
+                                  {analysis.documentCount}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-4">
                             <span className="text-sm text-slate-500">{analysis.date}</span>
@@ -468,7 +494,8 @@ const Index = () => {
                               try {
                                 const reader = new FileReader();
                                 reader.onload = async (ev) => {
-                                  const base64 = ev.target?.result?.toString().split(',')[1];
+                                  const base64 = ev.target?.result?.toString().split(',')[1] || '';
+                                  setUploadedFileBase64(base64);
                                   const res = await fetch(`${API_URLS.analysis}?action=parse`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },

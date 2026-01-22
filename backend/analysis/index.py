@@ -353,6 +353,7 @@ def handler(event: dict, context) -> dict:
             description = body.get('description', '')
             evidence = body.get('evidence', '')
             officer_id = body.get('officer_id', 1)
+            document = body.get('document', None)
             
             if not case_number or not incident_date or not description:
                 return {
@@ -383,6 +384,27 @@ def handler(event: dict, context) -> dict:
             ))
             
             new_analysis = cur.fetchone()
+            analysis_id = new_analysis['id']
+            
+            if document:
+                try:
+                    cur.execute("""
+                        INSERT INTO document_attachments (
+                            analysis_id, file_name, file_type, file_size, 
+                            extracted_text, uploaded_by
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, (
+                        analysis_id,
+                        document.get('file_name', 'document'),
+                        document.get('file_type', 'TXT'),
+                        document.get('file_size', 0),
+                        document.get('extracted_text', ''),
+                        officer_id
+                    ))
+                except Exception as doc_error:
+                    print(f"Warning: Failed to save document attachment: {str(doc_error)}")
             
             for article_num in analysis_result['suggested_articles']:
                 cur.execute("""
@@ -406,9 +428,18 @@ def handler(event: dict, context) -> dict:
                 FROM crime_analyses ca
                 LEFT JOIN users u ON ca.officer_id = u.id
                 WHERE ca.id = %s
-            """, (new_analysis['id'],))
+            """, (analysis_id,))
             
             complete_analysis = cur.fetchone()
+            
+            cur.execute("""
+                SELECT id, file_name, file_type, file_size, upload_date
+                FROM document_attachments
+                WHERE analysis_id = %s
+            """, (analysis_id,))
+            
+            documents = cur.fetchall()
+            complete_analysis['documents'] = documents if documents else []
             
             cur.close()
             conn.close()
@@ -432,11 +463,53 @@ def handler(event: dict, context) -> dict:
             status_filter = query_params.get('status', '')
             officer_id = query_params.get('officer_id', '')
             
+            analysis_id = query_params.get('analysis_id', '')
+            
+            if analysis_id:
+                cur.execute("""
+                    SELECT 
+                        ca.*,
+                        u.full_name as officer_name,
+                        u.rank as officer_rank
+                    FROM crime_analyses ca
+                    LEFT JOIN users u ON ca.officer_id = u.id
+                    WHERE ca.id = %s
+                """, (int(analysis_id),))
+                
+                analysis = cur.fetchone()
+                
+                if analysis:
+                    cur.execute("""
+                        SELECT id, file_name, file_type, file_size, upload_date, extracted_text
+                        FROM document_attachments
+                        WHERE analysis_id = %s
+                    """, (int(analysis_id),))
+                    
+                    documents = cur.fetchall()
+                    analysis['documents'] = documents if documents else []
+                    
+                    cur.close()
+                    conn.close()
+                    
+                    return {
+                        'statusCode': 200,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        'body': json.dumps({
+                            'success': True,
+                            'data': analysis
+                        }, default=str),
+                        'isBase64Encoded': False
+                    }
+            
             query = """
                 SELECT 
                     ca.*,
                     u.full_name as officer_name,
-                    u.rank as officer_rank
+                    u.rank as officer_rank,
+                    (SELECT COUNT(*) FROM document_attachments WHERE analysis_id = ca.id) as document_count
                 FROM crime_analyses ca
                 LEFT JOIN users u ON ca.officer_id = u.id
                 WHERE 1=1
