@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Получение списка пользователей",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "data": "array",
+        "count": "number"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Тест авторизации с неверными данными",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "username": "wronguser",
+        "password": "wrongpass"
+      },
+      "expectedStatus": 401,
+      "expectedBody": {
+        "success": false
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

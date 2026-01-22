@@ -1,0 +1,33 @@
+{
+  "tests": [
+    {
+      "name": "Получение списка анализов",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "data": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Создание анализа преступления",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "case_number": "TEST-2026-001",
+        "incident_date": "2026-01-23",
+        "category": "Преступления против собственности",
+        "description": "Совершена кража имущества на сумму 50000 рублей",
+        "evidence": "Показания свидетелей, видеозапись",
+        "officer_id": 1
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

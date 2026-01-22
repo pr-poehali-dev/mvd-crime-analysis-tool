@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,20 @@ import { Separator } from "@/components/ui/separator";
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
+const API_URLS = {
+  legislation: 'https://functions.poehali.dev/7c589562-40cd-4ff0-af36-027a834a4296',
+  auth: 'https://functions.poehali.dev/8e21a310-11ee-4b56-8199-850b5fbf89e8',
+  analysis: 'https://functions.poehali.dev/3d7c7265-98c8-4c18-ada1-80156838fa47'
+};
+
 const Index = () => {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
+  const [ukRfArticles, setUkRfArticles] = useState([]);
+  const [upkRfArticles, setUpkRfArticles] = useState([]);
+  const [constitutionArticles, setConstitutionArticles] = useState([]);
+  const [recentAnalyses, setRecentAnalyses] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const modules = [
     { id: 'dashboard', name: 'Главная панель', icon: 'LayoutDashboard' },
@@ -23,40 +34,97 @@ const Index = () => {
     { id: 'reports', name: 'Отчёты', icon: 'BarChart3' },
   ];
 
-  const ukRfArticles = [
-    { num: '105', title: 'Убийство', category: 'Преступления против жизни и здоровья', severity: 'Особо тяжкое' },
-    { num: '158', title: 'Кража', category: 'Преступления против собственности', severity: 'Средней тяжести' },
-    { num: '159', title: 'Мошенничество', category: 'Преступления против собственности', severity: 'Средней тяжести' },
-    { num: '161', title: 'Грабёж', category: 'Преступления против собственности', severity: 'Тяжкое' },
-    { num: '162', title: 'Разбой', category: 'Преступления против собственности', severity: 'Тяжкое' },
-    { num: '228', title: 'Незаконные приобретение, хранение, перевозка, изготовление наркотических средств', category: 'Преступления против здоровья населения', severity: 'Тяжкое' },
-    { num: '264', title: 'Нарушение правил дорожного движения', category: 'Преступления против безопасности движения', severity: 'Средней тяжести' },
-  ];
+  useEffect(() => {
+    loadLegislation();
+    loadAnalyses();
+  }, []);
 
-  const upkRfArticles = [
-    { num: '73', title: 'Обстоятельства, подлежащие доказыванию', category: 'Доказательства и доказывание' },
-    { num: '146', title: 'Возбуждение уголовного дела', category: 'Досудебное производство' },
-    { num: '171', title: 'Следственные действия', category: 'Предварительное расследование' },
-    { num: '307', title: 'Приговор суда', category: 'Судебное разбирательство' },
-  ];
+  const loadLegislation = async () => {
+    try {
+      const [ukRes, upkRes, constRes] = await Promise.all([
+        fetch(`${API_URLS.legislation}?type=uk_rf`),
+        fetch(`${API_URLS.legislation}?type=upk_rf`),
+        fetch(`${API_URLS.legislation}?type=constitution`)
+      ]);
+      
+      const ukData = await ukRes.json();
+      const upkData = await upkRes.json();
+      const constData = await constRes.json();
+      
+      setUkRfArticles(ukData.data.map((a: any) => ({ 
+        num: a.article_number, 
+        title: a.title, 
+        category: a.category, 
+        severity: a.severity 
+      })));
+      setUpkRfArticles(upkData.data.map((a: any) => ({ 
+        num: a.article_number, 
+        title: a.title, 
+        category: a.category 
+      })));
+      setConstitutionArticles(constData.data.map((a: any) => ({ 
+        num: a.article_number, 
+        title: a.title, 
+        category: a.category 
+      })));
+    } catch (error) {
+      console.error('Ошибка загрузки законодательства:', error);
+    }
+  };
 
-  const constitutionArticles = [
-    { num: '2', title: 'Человек, его права и свободы являются высшей ценностью', category: 'Основы конституционного строя' },
-    { num: '19', title: 'Равенство перед законом и судом', category: 'Права и свободы человека и гражданина' },
-    { num: '49', title: 'Презумпция невиновности', category: 'Права и свободы человека и гражданина' },
-    { num: '51', title: 'Право не свидетельствовать против себя', category: 'Права и свободы человека и гражданина' },
-  ];
+  const loadAnalyses = async () => {
+    try {
+      const res = await fetch(API_URLS.analysis);
+      const data = await res.json();
+      setRecentAnalyses(data.data.slice(0, 3).map((a: any) => ({
+        id: a.id,
+        date: new Date(a.created_at).toLocaleDateString('ru-RU'),
+        type: `${a.category} (дело ${a.case_number})`,
+        status: a.status === 'completed' ? 'Завершён' : 'В обработке',
+        officer: a.officer_name || 'Неизвестно'
+      })));
+    } catch (error) {
+      console.error('Ошибка загрузки анализов:', error);
+    }
+  };
 
-  const recentAnalyses = [
-    { id: 1, date: '23.01.2026', type: 'Кража (ст. 158 УК РФ)', status: 'Завершён', officer: 'Иванов И.И.' },
-    { id: 2, date: '23.01.2026', type: 'Грабёж (ст. 161 УК РФ)', status: 'В обработке', officer: 'Петров П.П.' },
-    { id: 3, date: '22.01.2026', type: 'Мошенничество (ст. 159 УК РФ)', status: 'Завершён', officer: 'Сидоров С.С.' },
-  ];
+  const handleAnalyze = async () => {
+    setLoading(true);
+    try {
+      const caseNumber = (document.getElementById('case-number') as HTMLInputElement)?.value;
+      const date = (document.getElementById('date') as HTMLInputElement)?.value;
+      const category = 'Преступления против собственности';
+      const description = (document.getElementById('description') as HTMLTextAreaElement)?.value;
+      const evidence = (document.getElementById('evidence') as HTMLTextAreaElement)?.value;
 
-  const handleAnalyze = () => {
-    toast.success('Анализ запущен', {
-      description: 'Система обрабатывает данные преступления'
-    });
+      const res = await fetch(API_URLS.analysis, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_number: caseNumber,
+          incident_date: date,
+          category,
+          description,
+          evidence,
+          officer_id: 1
+        })
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        toast.success('Анализ завершён', {
+          description: `Применимые статьи: ${data.data.analysis_result.suggested_articles.join(', ')}`
+        });
+        loadAnalyses();
+      } else {
+        toast.error('Ошибка анализа', { description: data.error });
+      }
+    } catch (error) {
+      toast.error('Ошибка', { description: 'Не удалось выполнить анализ' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExport = () => {
@@ -245,9 +313,9 @@ const Index = () => {
                       />
                     </div>
 
-                    <Button onClick={handleAnalyze} className="w-full" size="lg">
+                    <Button onClick={handleAnalyze} className="w-full" size="lg" disabled={loading}>
                       <Icon name="Search" size={20} className="mr-2" />
-                      Провести анализ
+                      {loading ? 'Анализирую...' : 'Провести анализ'}
                     </Button>
                   </CardContent>
                 </Card>
