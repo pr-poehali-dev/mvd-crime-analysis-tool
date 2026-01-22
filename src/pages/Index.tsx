@@ -19,6 +19,9 @@ const API_URLS = {
 };
 
 const Index = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [activeModule, setActiveModule] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [ukRfArticles, setUkRfArticles] = useState([]);
@@ -35,9 +38,19 @@ const Index = () => {
   ];
 
   useEffect(() => {
-    loadLegislation();
-    loadAnalyses();
+    const savedUser = localStorage.getItem('mvd_user');
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+      setIsAuthenticated(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadLegislation();
+      loadAnalyses();
+    }
+  }, [isAuthenticated]);
 
   const loadLegislation = async () => {
     try {
@@ -133,6 +146,102 @@ const Index = () => {
     });
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(API_URLS.auth, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          username: loginForm.username,
+          password: loginForm.password
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setCurrentUser(data.data.user);
+        setIsAuthenticated(true);
+        localStorage.setItem('mvd_user', JSON.stringify(data.data.user));
+        localStorage.setItem('mvd_token', data.data.token);
+        toast.success('Добро пожаловать!', {
+          description: `${data.data.user.rank} ${data.data.user.full_name}`
+        });
+      } else {
+        toast.error('Ошибка входа', { description: data.error });
+      }
+    } catch (error) {
+      toast.error('Ошибка', { description: 'Не удалось выполнить вход' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    localStorage.removeItem('mvd_user');
+    localStorage.removeItem('mvd_token');
+    toast.info('Вы вышли из системы');
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md animate-fade-in">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto w-20 h-20 bg-primary rounded-full flex items-center justify-center">
+              <Icon name="Shield" size={40} className="text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl font-bold">МВД России</CardTitle>
+              <CardDescription className="text-base mt-2">
+                Система автоматизированного анализа преступлений
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Имя пользователя</Label>
+                <Input
+                  id="username"
+                  placeholder="Введите логин"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Пароль</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Введите пароль"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                <Icon name="LogIn" size={20} className="mr-2" />
+                {loading ? 'Вход...' : 'Войти в систему'}
+              </Button>
+            </form>
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-slate-700 font-semibold mb-2">Тестовый доступ:</p>
+              <p className="text-xs text-slate-600">Логин: admin</p>
+              <p className="text-xs text-slate-600">Пароль: admin123</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="flex">
@@ -168,12 +277,21 @@ const Index = () => {
 
           <Separator className="my-6 bg-slate-600" />
 
+          <div className="space-y-3 mb-4">
+            <div className="px-4 py-3 bg-secondary/80 rounded-lg">
+              <p className="text-xs text-slate-400">Вы вошли как:</p>
+              <p className="text-sm font-semibold text-white">{currentUser?.rank}</p>
+              <p className="text-sm text-slate-300">{currentUser?.full_name}</p>
+              <Badge variant="outline" className="mt-2 text-xs">{currentUser?.role === 'admin' ? 'Администратор' : 'Сотрудник'}</Badge>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-secondary/80 hover:text-white transition-all">
               <Icon name="Settings" size={20} />
               <span className="font-medium">Настройки</span>
             </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-secondary/80 hover:text-white transition-all">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-all">
               <Icon name="LogOut" size={20} />
               <span className="font-medium">Выход</span>
             </button>
