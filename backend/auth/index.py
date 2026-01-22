@@ -21,7 +21,15 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     """Проверка пароля"""
-    return bcrypt.checkpw(password.encode(), password_hash.encode())
+    try:
+        # Логирование для отладки
+        print(f"DEBUG: Checking password, hash starts with: {password_hash[:10]}")
+        result = bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+        print(f"DEBUG: Password check result: {result}")
+        return result
+    except Exception as e:
+        print(f"ERROR in verify_password: {str(e)}")
+        return False
 
 def generate_token() -> str:
     """Генерация токена сессии"""
