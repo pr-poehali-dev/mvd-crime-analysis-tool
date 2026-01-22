@@ -22,13 +22,17 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     """Проверка пароля"""
     try:
-        # Логирование для отладки
-        print(f"DEBUG: Checking password, hash starts with: {password_hash[:10]}")
+        print(f"DEBUG: Checking password length: {len(password)}")
+        print(f"DEBUG: Password bytes: {password.encode('utf-8')}")
+        print(f"DEBUG: Hash starts with: {password_hash[:20]}")
+        print(f"DEBUG: Hash length: {len(password_hash)}")
         result = bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
         print(f"DEBUG: Password check result: {result}")
         return result
     except Exception as e:
         print(f"ERROR in verify_password: {str(e)}")
+        import traceback
+        print(f"TRACEBACK: {traceback.format_exc()}")
         return False
 
 def generate_token() -> str:
