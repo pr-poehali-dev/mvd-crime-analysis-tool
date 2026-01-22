@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 import hashlib
 import secrets
+import bcrypt
 
 def get_db_connection():
     """Подключение к базе данных PostgreSQL"""
@@ -14,8 +15,13 @@ def get_db_connection():
     )
 
 def hash_password(password: str) -> str:
-    """Хеширование пароля"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Хеширование пароля с bcrypt"""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Проверка пароля"""
+    return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 def generate_token() -> str:
     """Генерация токена сессии"""
@@ -63,17 +69,15 @@ def handler(event: dict, context) -> dict:
                         'isBase64Encoded': False
                     }
                 
-                password_hash = hash_password(password)
-                
                 cur.execute("""
-                    SELECT id, username, full_name, rank, department, role, is_active
+                    SELECT id, username, full_name, rank, department, role, is_active, password_hash
                     FROM users
-                    WHERE username = %s AND password_hash = %s AND is_active = true
-                """, (username, password_hash))
+                    WHERE username = %s AND is_active = true
+                """, (username,))
                 
                 user = cur.fetchone()
                 
-                if not user:
+                if not user or not verify_password(password, user['password_hash']):
                     cur.close()
                     conn.close()
                     return {
@@ -99,6 +103,8 @@ def handler(event: dict, context) -> dict:
                 
                 token = generate_token()
                 
+                user_data = {k: v for k, v in user.items() if k != 'password_hash'}
+                
                 cur.close()
                 conn.close()
                 
@@ -112,7 +118,7 @@ def handler(event: dict, context) -> dict:
                         'success': True,
                         'message': 'Авторизация успешна',
                         'data': {
-                            'user': dict(user),
+                            'user': user_data,
                             'token': token
                         }
                     }, default=str),
