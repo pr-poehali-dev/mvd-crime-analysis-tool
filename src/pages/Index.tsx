@@ -29,6 +29,8 @@ const Index = () => {
   const [constitutionArticles, setConstitutionArticles] = useState([]);
   const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [extractedText, setExtractedText] = useState('');
 
   const modules = [
     { id: 'dashboard', name: 'Главная панель', icon: 'LayoutDashboard' },
@@ -448,6 +450,70 @@ const Index = () => {
                           <SelectItem value="economic">Преступления в сфере экономики</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Загрузить документ (опционально)</Label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 hover:border-primary transition-colors cursor-pointer">
+                        <input
+                          type="file"
+                          id="file-upload"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.txt"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadedFile(file);
+                              setLoading(true);
+                              try {
+                                const reader = new FileReader();
+                                reader.onload = async (ev) => {
+                                  const base64 = ev.target?.result?.toString().split(',')[1];
+                                  const res = await fetch(`${API_URLS.analysis}?action=parse`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      file_data: base64,
+                                      file_name: file.name
+                                    })
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    setExtractedText(data.data.text);
+                                    (document.getElementById('description') as HTMLTextAreaElement).value = data.data.text;
+                                    toast.success('Документ обработан!', {
+                                      description: `Извлечено ${data.data.text.length} символов`
+                                    });
+                                  } else {
+                                    toast.error('Ошибка обработки документа', { description: data.error });
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              } catch (error) {
+                                toast.error('Ошибка загрузки файла');
+                              } finally {
+                                setLoading(false);
+                              }
+                            }
+                          }}
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                          {uploadedFile ? (
+                            <>
+                              <Icon name="FileCheck" size={40} className="text-green-600" />
+                              <p className="text-sm font-semibold text-secondary">{uploadedFile.name}</p>
+                              <p className="text-xs text-slate-500">Нажмите, чтобы выбрать другой файл</p>
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="Upload" size={40} className="text-slate-400" />
+                              <p className="text-sm font-semibold text-secondary">Загрузите документ</p>
+                              <p className="text-xs text-slate-500">PDF, Word, TXT</p>
+                              <p className="text-xs text-slate-400 mt-1">Текст автоматически заполнит поле ниже</p>
+                            </>
+                          )}
+                        </label>
+                      </div>
                     </div>
 
                     <div className="space-y-2">

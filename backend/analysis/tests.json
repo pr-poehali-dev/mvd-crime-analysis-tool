@@ -28,6 +28,23 @@
         "success": true
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Парсинг TXT документа",
+      "method": "POST",
+      "path": "/?action=parse",
+      "body": {
+        "file_data": "0JTQvtC60YPQvNC10L3RgiDQvtCx0L4g0YDQsNGB0YHQu9C10LTQvtCy0LDQvdC40Lgg0L/RgNC10YHRgtGD0L/Qu9C10L3QuNGPCgrQniDRgdC+0LHRi9GC0LjQuDoKMjMuMDEuMjAyNiDQstGA0LXQvNGPOiAxNDowMAo=",
+        "file_name": "test_document.txt"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "data": {
+          "file_type": "TXT"
+        }
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }

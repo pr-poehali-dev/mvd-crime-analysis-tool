@@ -3,6 +3,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+from parse_document import parse_document
 
 def get_db_connection():
     """Подключение к базе данных PostgreSQL"""
@@ -283,6 +284,63 @@ def handler(event: dict, context) -> dict:
         }
     
     try:
+        query_params = event.get('queryStringParameters', {}) or {}
+        action = query_params.get('action', '')
+        
+        if method == 'POST' and action == 'parse':
+            body = json.loads(event.get('body', '{}'))
+            file_data = body.get('file_data', '')
+            file_name = body.get('file_name', '')
+            
+            if not file_data or not file_name:
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'success': False,
+                        'error': 'Файл не загружен'
+                    }),
+                    'isBase64Encoded': False
+                }
+            
+            try:
+                text, file_type = parse_document(file_data, file_name)
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'success': True,
+                        'message': f'Документ {file_type} обработан успешно',
+                        'data': {
+                            'text': text,
+                            'file_name': file_name,
+                            'file_type': file_type,
+                            'text_length': len(text)
+                        }
+                    }),
+                    'isBase64Encoded': False
+                }
+            except Exception as parse_error:
+                return {
+                    'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'success': False,
+                        'error': str(parse_error)
+                    }),
+                    'isBase64Encoded': False
+                }
+        
         conn = get_db_connection()
         cur = conn.cursor()
         
